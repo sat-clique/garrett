@@ -1,4 +1,7 @@
-add_executable(garrett main.cpp)
+add_executable(garrett
+  evaluation.cpp
+  main.cpp
+)
 
 target_link_libraries(garrett PRIVATE cnfkit gatekit)
 target_include_directories(garrett PRIVATE "${LibArchive_INCLUDE_DIR}")
