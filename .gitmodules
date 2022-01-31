@@ -1,0 +1,6 @@
+[submodule "deps/gatekit"]
+	path = deps/gatekit
+	url = https://github.com/sat-clique/gatekit
+[submodule "deps/cnfkit"]
+	path = deps/cnfkit
+	url = https://github.com/sat-clique/cnfkit
