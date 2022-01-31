@@ -13,7 +13,7 @@ git submodule update
 
 `garrett` has only a single runtime dependency: `libarchive`.
 
-This tool can be built like a regular CMake project:
+`garrett` is a regular CMake project. To build it, run
 
 ```
 mkdir build && cd build
@@ -23,6 +23,7 @@ make -j
 
 ## Running `garrett`
 
-After building garrett, run `bin/garrett <CNFFile>`. The tool will scan the gate structure of the problem instance in `<CNFFile>` and print some metrics.
-`<CNFFile>` may be compressed with any format supported by libarchive.
+After building garrett, run `bin/garrett <CNFFile>`. The tool will run
+`gatekit`'s gate structure scanner on the given CNF file and and print some metrics.
+`<CNFFile>` may be compressed in any format supported by `libarchive`.
 
