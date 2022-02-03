@@ -4,3 +4,6 @@
 [submodule "deps/cnfkit"]
 	path = deps/cnfkit
 	url = https://github.com/sat-clique/cnfkit
+[submodule "deps/minisat"]
+	path = deps/minisat
+	url = https://github.com/fkutzner/minisat

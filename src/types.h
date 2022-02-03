@@ -56,5 +56,3 @@ public:
 private:
   typename Clock::time_point m_start;
 };
-
-

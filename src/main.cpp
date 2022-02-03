@@ -1,5 +1,6 @@
 #include "evaluation.h"
 #include "types.h"
+#include "validation.h"
 
 #include <cnfkit/dimacs_parser.h>
 #include <cnfkit/io/io_libarchive.h>
@@ -42,6 +43,8 @@ void evaluate_gate_structure(std::filesystem::path const& path)
               gate_structure,
               path,
               std::chrono::duration_cast<std::chrono::milliseconds>(elapsed));
+
+  std::cout << (is_valid_gate_structure(gate_structure) ? "valid" : "invalid") << "\n";
 }
 }
 
