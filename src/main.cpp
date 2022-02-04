@@ -44,7 +44,11 @@ void evaluate_gate_structure(std::filesystem::path const& path)
               path,
               std::chrono::duration_cast<std::chrono::milliseconds>(elapsed));
 
-  std::cout << (is_valid_gate_structure(gate_structure) ? "valid" : "invalid") << "\n";
+  auto progress_fn = [](std::size_t num_verified_gates) {
+    std::cout << num_verified_gates << "\n";
+  };
+  std::cout << (is_valid_gate_structure(gate_structure, 2, progress_fn) ? "valid" : "invalid")
+            << "\n";
 }
 }
 

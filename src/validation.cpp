@@ -5,10 +5,17 @@
 
 #include <minisat/core/Solver.h>
 
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <functional>
+#include <future>
 #include <iostream>
+#include <numeric>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
 namespace {
@@ -147,14 +154,62 @@ void print_invalid_gate(gatekit::gate<ClauseHandle> const& gate)
     std::cout << clause_to_string(*clause) << "\n";
   }
 }
+
+template <typename GateIter>
+auto verify_gates(GateIter start, GateIter stop, std::atomic<std::size_t>* num_verified_gates)
+    -> bool
+{
+  GateIter current = start;
+  while (current != stop) {
+    if (!is_valid_gate(*current)) {
+      print_invalid_gate(*current);
+      return false;
+    }
+
+    ++current;
+    ++(*num_verified_gates);
+  }
+
+  return true;
+}
 }
 
-auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& structure) -> bool
+auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& structure,
+                             std::size_t num_threads,
+                             std::function<void(std::size_t)> const& progress_callback) -> bool
 {
-  for (gatekit::gate<ClauseHandle> const& gate : structure.gates) {
-    if (!is_valid_gate(gate)) {
-      print_invalid_gate(gate);
-      return false;
+  size_t const chunk_size = (structure.gates.size() / num_threads) + 1;
+
+  std::vector<std::future<bool>> results;
+  std::vector<std::unique_ptr<std::atomic<std::size_t>>> progress;
+
+  auto chunk_start = structure.gates.begin();
+  for (size_t n = 0; n < num_threads; ++n) {
+    auto chunk_end = chunk_start;
+    if (std::distance(chunk_end, structure.gates.end()) <= chunk_size) {
+      chunk_end = structure.gates.end();
+    }
+    else {
+      chunk_end = chunk_start + chunk_size;
+    }
+
+    progress.push_back(std::make_unique<std::atomic<std::size_t>>(0));
+    results.push_back(std::async(std::launch::async,
+                                 verify_gates<decltype(chunk_start)>,
+                                 chunk_start,
+                                 chunk_end,
+                                 progress.back().get()));
+  }
+
+  for (auto& future : results) {
+    std::future_status status = std::future_status::timeout;
+    while (status == std::future_status::timeout) {
+      status = future.wait_for(std::chrono::milliseconds{100});
+      std::size_t total_verified_gates = 0;
+      for (auto const& progress_counter : progress) {
+        total_verified_gates += *progress_counter;
+      }
+      progress_callback(total_verified_gates);
     }
   }
 
