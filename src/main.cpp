@@ -1,4 +1,5 @@
 #include "evaluation.h"
+#include "progress_indicator.h"
 #include "types.h"
 #include "validation.h"
 
@@ -13,6 +14,8 @@
 #include <vector>
 
 namespace {
+constexpr size_t progress_bar_width = 50;
+
 auto parse_problem(std::filesystem::path const& path) -> std::vector<Clause>
 {
   std::vector<Clause> problem;
@@ -31,24 +34,41 @@ auto scan_gates(std::vector<Clause> const& problem) -> gatekit::gate_structure<C
   return gatekit::scan_gates<ClauseHandle>(start, start + problem.size());
 }
 
+enum class gate_structure_validity { valid, invalid };
+
+auto verify_gate_structure(gatekit::gate_structure<ClauseHandle> const& structure)
+    -> gate_structure_validity
+{
+  progress_indicator bar{progress_bar_width, "Verifying gates"};
+
+  auto progress_fn = [&bar, &structure](std::size_t num_verified_gates) {
+    bar.set_progress(static_cast<double>(num_verified_gates) / structure.gates.size());
+  };
+
+  bool const result = is_valid_gate_structure(structure, 2, progress_fn);
+
+  return result ? gate_structure_validity::valid : gate_structure_validity::invalid;
+}
+
 void evaluate_gate_structure(std::filesystem::path const& path)
 {
   std::vector<Clause> problem = parse_problem(path);
+
+  progress_indicator bar{progress_bar_width, "Scanning gates"};
 
   stopwatch gate_scan_stopwatch;
   auto gate_structure = scan_gates(problem);
   auto elapsed = gate_scan_stopwatch.duration_since_start();
 
+  bar.set_finished();
+
+  gate_structure_validity valid = verify_gate_structure(gate_structure);
+
   print_stats(problem,
               gate_structure,
               path,
               std::chrono::duration_cast<std::chrono::milliseconds>(elapsed));
-
-  auto progress_fn = [](std::size_t num_verified_gates) {
-    std::cout << num_verified_gates << "\n";
-  };
-  std::cout << (is_valid_gate_structure(gate_structure, 2, progress_fn) ? "valid" : "invalid")
-            << "\n";
+  std::cout << "valid: " << (valid == gate_structure_validity::valid) << "\n";
 }
 }
 

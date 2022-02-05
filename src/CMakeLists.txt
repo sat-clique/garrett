@@ -1,6 +1,7 @@
 add_executable(garrett
   evaluation.cpp
   main.cpp
+  progress_indicator.cpp
   validation.cpp
 )
 
