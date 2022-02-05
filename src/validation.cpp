@@ -141,8 +141,11 @@ auto has_right_uniqueness(gatekit::gate<ClauseHandle> const& gate, sat_solver& s
 
 auto is_valid_gate(gatekit::gate<ClauseHandle> const& gate) -> bool
 {
+  // TODO: also check that if a gate with output o is nested monotonically,
+  // o does not occur in any gate input
   sat_solver solver;
-  bool const result = has_left_totality(gate, solver) && has_right_uniqueness(gate, solver);
+  bool const result = has_left_totality(gate, solver) &&
+                      (gate.is_nested_monotonically || has_right_uniqueness(gate, solver));
   return result;
 }
 
