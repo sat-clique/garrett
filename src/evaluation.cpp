@@ -51,6 +51,14 @@ auto clauses_in_gates(gatekit::gate_structure<ClauseHandle> const& structure) ->
   return result;
 }
 
+auto monotonic_gates(gatekit::gate_structure<ClauseHandle> const& structure) -> size_t
+{
+  return std::count_if(
+      structure.gates.begin(), structure.gates.end(), [](gatekit::gate<ClauseHandle> const& g) {
+        return g.is_nested_monotonically;
+      });
+}
+
 template <typename T>
 void print_stat(std::string name, T&& value)
 {
@@ -77,4 +85,7 @@ void print_stats(std::vector<Clause> const& problem,
   print_stat("num_clauses_in_gates/num_clauses_in_problem",
              static_cast<double>(clauses_in_gates(structure)) /
                  static_cast<double>(clauses_in_problem(problem)));
+  print_stat("num_monotonic_gates", monotonic_gates(structure));
+  print_stat("num_monotonic_gates/num_gates",
+             static_cast<double>(monotonic_gates(structure)) / structure.gates.size());
 }
