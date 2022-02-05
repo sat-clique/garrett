@@ -100,11 +100,28 @@ private:
   std::unordered_map<uint32_t, Minisat::Var> m_vars;
 };
 
+auto has_constant_output(gatekit::gate<ClauseHandle> const& gate, sat_solver& solver) -> bool
+{
+  solver.add_assumption(gate.output);
+  bool const sat_pos = solver.is_satisfiable();
+
+  solver.add_assumption(-gate.output);
+  bool const sat_neg = solver.is_satisfiable();
+
+  return sat_pos != sat_neg;
+}
 
 auto has_left_totality(gatekit::gate<ClauseHandle> const& gate, sat_solver& solver) -> bool
 {
   for (ClauseHandle const& clause : gate.clauses) {
     solver.add_clause(*clause);
+  }
+
+  // For gates like {(-a a o), (-a -o), (a -o)} (see for example 6s176.cnf in
+  // the optimized HWMCC12 miter benchmark set), -o is constantly true. (-a a o)
+  // never propagates o.
+  if (has_constant_output(gate, solver)) {
+    return true;
   }
 
   for (ClauseHandle const& clause : gate.clauses) {
@@ -138,15 +155,22 @@ auto has_right_uniqueness(gatekit::gate<ClauseHandle> const& gate, sat_solver& s
   return !solver.is_satisfiable();
 }
 
+using monotonic_input_signs_vector = std::vector<std::optional<cnfkit::lit>>;
 
-auto is_valid_gate(gatekit::gate<ClauseHandle> const& gate) -> bool
+auto is_valid_gate(gatekit::gate<ClauseHandle> const& gate,
+                   monotonic_input_signs_vector const& monotonic_input_signs_vec) -> bool
 {
-  // TODO: also check that if a gate with output o is nested monotonically,
-  // o does not occur in any gate input
   sat_solver solver;
-  bool const result = has_left_totality(gate, solver) &&
-                      (gate.is_nested_monotonically || has_right_uniqueness(gate, solver));
-  return result;
+
+  if (gate.is_nested_monotonically) {
+    size_t out_var_idx = gate.output.get_var().get_raw_value();
+    bool const nesting_ok = (monotonic_input_signs_vec[out_var_idx].has_value() &&
+                             *monotonic_input_signs_vec[out_var_idx] == gate.output);
+    return nesting_ok && has_left_totality(gate, solver);
+  }
+  else {
+    return has_left_totality(gate, solver) && has_right_uniqueness(gate, solver);
+  }
 }
 
 
@@ -159,12 +183,14 @@ void print_invalid_gate(gatekit::gate<ClauseHandle> const& gate)
 }
 
 template <typename GateIter>
-auto verify_gates(GateIter start, GateIter stop, std::atomic<std::size_t>* num_verified_gates)
-    -> bool
+auto verify_gates(GateIter start,
+                  GateIter stop,
+                  monotonic_input_signs_vector const& monotonic_input_signs_vec,
+                  std::atomic<std::size_t>* num_verified_gates) -> bool
 {
   GateIter current = start;
   while (current != stop) {
-    if (!is_valid_gate(*current)) {
+    if (!is_valid_gate(*current, monotonic_input_signs_vec)) {
       print_invalid_gate(*current);
       return false;
     }
@@ -174,6 +200,50 @@ auto verify_gates(GateIter start, GateIter stop, std::atomic<std::size_t>* num_v
   }
 
   return true;
+}
+
+
+auto monotonic_input_signs(gatekit::gate_structure<ClauseHandle> const& structure)
+    -> monotonic_input_signs_vector
+{
+  monotonic_input_signs_vector result;
+
+  for (gatekit::gate<ClauseHandle> const& gate : structure.gates) {
+    for (cnfkit::lit lit : gate.inputs) {
+      size_t const index = lit.get_var().get_raw_value();
+
+      if (result.size() <= index) {
+        result.resize(2 * index);
+      }
+
+      if (gate.is_nested_monotonically && !result[index].has_value()) {
+        result[index] = lit;
+      }
+      else if (!gate.is_nested_monotonically) {
+        // non-monotonic -> inputs are relevant with both signs
+        result[index] = cnfkit::lit{};
+      }
+    }
+  }
+
+  for (std::vector<cnfkit::lit> const& root_clause : structure.roots) {
+    for (cnfkit::lit lit : root_clause) {
+      size_t const index = lit.get_var().get_raw_value();
+
+      if (result.size() <= index) {
+        result.resize(2 * index);
+      }
+
+      if (!result[index].has_value()) {
+        result[index] = lit;
+      }
+      else if (*result[index] != lit) {
+        result[index] = cnfkit::lit{};
+      }
+    }
+  }
+
+  return result;
 }
 }
 
@@ -185,6 +255,7 @@ auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& struct
 
   std::vector<std::future<bool>> results;
   std::vector<std::unique_ptr<std::atomic<std::size_t>>> progress;
+  auto monotonic_input_signs_vec = monotonic_input_signs(structure);
 
   auto chunk_start = structure.gates.begin();
   for (size_t n = 0; n < num_threads; ++n) {
@@ -201,6 +272,7 @@ auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& struct
                                  verify_gates<decltype(chunk_start)>,
                                  chunk_start,
                                  chunk_end,
+                                 monotonic_input_signs_vec,
                                  progress.back().get()));
   }
 
