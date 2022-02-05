@@ -100,47 +100,45 @@ private:
   std::unordered_map<uint32_t, Minisat::Var> m_vars;
 };
 
-auto has_constant_output(gatekit::gate<ClauseHandle> const& gate, sat_solver& solver) -> bool
-{
-  solver.add_assumption(gate.output);
-  bool const sat_pos = solver.is_satisfiable();
 
-  solver.add_assumption(-gate.output);
-  bool const sat_neg = solver.is_satisfiable();
-
-  return sat_pos != sat_neg;
-}
-
-auto has_left_totality(gatekit::gate<ClauseHandle> const& gate, sat_solver& solver) -> bool
-{
-  for (ClauseHandle const& clause : gate.clauses) {
-    solver.add_clause(*clause);
-  }
-
-  // For gates like {(-a a o), (-a -o), (a -o)} (see for example 6s176.cnf in
-  // the optimized HWMCC12 miter benchmark set), -o is constantly true. (-a a o)
-  // never propagates o.
-  if (has_constant_output(gate, solver)) {
-    return true;
-  }
-
-  for (ClauseHandle const& clause : gate.clauses) {
-    for (cnfkit::lit const& lit : *clause) {
-      if (lit.get_var() != gate.output.get_var()) {
-        solver.add_assumption(-lit);
-      }
+auto is_resolvent_taut(std::vector<cnfkit::lit> const& lhs, std::vector<cnfkit::lit> const& rhs, cnfkit::lit resolve_at) -> bool {
+  for (auto lhs_lit : lhs) {
+    if (lhs_lit.get_var() == resolve_at.get_var()) {
+      continue;
     }
 
-    if (!solver.is_satisfiable()) {
-      return false;
+    for (auto rhs_lit : rhs) {
+      if (rhs_lit.get_var() == resolve_at.get_var()) {
+        continue;
+      }
+
+      if (lhs_lit == -rhs_lit) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+auto has_left_totality(gatekit::gate<ClauseHandle> const& gate) -> bool
+{
+  for (std::size_t lhs = 0; lhs < gate.num_fwd_clauses; ++lhs) {
+    for (std::size_t rhs = gate.num_fwd_clauses; rhs < gate.clauses.size(); ++rhs) {
+      if (!is_resolvent_taut(*gate.clauses[lhs], *gate.clauses[rhs], gate.output)) {
+        return false;
+      }
     }
   }
 
   return true;
 }
 
-auto has_right_uniqueness(gatekit::gate<ClauseHandle> const& gate, sat_solver& solver) -> bool
+
+auto has_right_uniqueness(gatekit::gate<ClauseHandle> const& gate) -> bool
 {
+  sat_solver solver;
+
   std::vector<cnfkit::lit> clause_without_o;
   for (ClauseHandle const& clause : gate.clauses) {
     for (cnfkit::lit const& lit : *clause) {
@@ -160,16 +158,14 @@ using monotonic_input_signs_vector = std::vector<std::optional<cnfkit::lit>>;
 auto is_valid_gate(gatekit::gate<ClauseHandle> const& gate,
                    monotonic_input_signs_vector const& monotonic_input_signs_vec) -> bool
 {
-  sat_solver solver;
-
   if (gate.is_nested_monotonically) {
     size_t out_var_idx = gate.output.get_var().get_raw_value();
     bool const nesting_ok = (monotonic_input_signs_vec[out_var_idx].has_value() &&
                              *monotonic_input_signs_vec[out_var_idx] == gate.output);
-    return nesting_ok && has_left_totality(gate, solver);
+    return nesting_ok && has_left_totality(gate);
   }
   else {
-    return has_left_totality(gate, solver) && has_right_uniqueness(gate, solver);
+    return has_left_totality(gate) && has_right_uniqueness(gate);
   }
 }
 
