@@ -277,6 +277,8 @@ auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& struct
     chunk_start = chunk_end;
   }
 
+  bool result = true;
+
   for (auto& future : results) {
     std::future_status status = std::future_status::timeout;
     while (status == std::future_status::timeout) {
@@ -286,8 +288,12 @@ auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& struct
         total_verified_gates += *progress_counter;
       }
       progress_callback(total_verified_gates);
+
+      if (status == std::future_status::ready) {
+        result = result && future.get();
+      }
     }
   }
 
-  return true;
+  return result;
 }
