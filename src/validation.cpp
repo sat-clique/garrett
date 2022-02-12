@@ -215,8 +215,13 @@ auto monotonic_input_signs(gatekit::gate_structure<ClauseHandle> const& structur
         result.resize(2 * index);
       }
 
-      if (gate.is_nested_monotonically && !result[index].has_value()) {
-        result[index] = lit;
+      if (gate.is_nested_monotonically) {
+        if (!result[index].has_value()) {
+          result[index] = lit;
+        }
+        else if (result[index] != lit) {
+          result[index] = cnfkit::lit{};
+        }
       }
       else if (!gate.is_nested_monotonically) {
         // non-monotonic -> inputs are relevant with both signs
