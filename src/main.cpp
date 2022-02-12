@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -45,7 +46,8 @@ auto verify_gate_structure(gatekit::gate_structure<ClauseHandle> const& structur
     bar.set_progress(static_cast<double>(num_verified_gates) / structure.gates.size());
   };
 
-  bool const result = is_valid_gate_structure(structure, 2, progress_fn);
+  unsigned int num_threads = std::min(2u, std::thread::hardware_concurrency());
+  bool const result = is_valid_gate_structure(structure, num_threads, progress_fn);
 
   return result ? gate_structure_validity::valid : gate_structure_validity::invalid;
 }
