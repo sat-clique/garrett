@@ -212,7 +212,7 @@ auto monotonic_input_signs(gatekit::gate_structure<ClauseHandle> const& structur
       size_t const index = lit.get_var().get_raw_value();
 
       if (result.size() <= index) {
-        result.resize(2 * index);
+        result.resize(2 * index + 1);
       }
 
       if (gate.is_nested_monotonically) {
@@ -235,7 +235,7 @@ auto monotonic_input_signs(gatekit::gate_structure<ClauseHandle> const& structur
       size_t const index = lit.get_var().get_raw_value();
 
       if (result.size() <= index) {
-        result.resize(2 * index);
+        result.resize(2 * index + 1);
       }
 
       if (!result[index].has_value()) {
