@@ -270,6 +270,8 @@ auto is_valid_gate_structure(gatekit::gate_structure<ClauseHandle> const& struct
                                  chunk_end,
                                  monotonic_input_signs_vec,
                                  progress.back().get()));
+
+    chunk_start = chunk_end;
   }
 
   for (auto& future : results) {
