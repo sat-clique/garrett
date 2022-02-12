@@ -101,7 +101,10 @@ private:
 };
 
 
-auto is_resolvent_taut(std::vector<cnfkit::lit> const& lhs, std::vector<cnfkit::lit> const& rhs, cnfkit::lit resolve_at) -> bool {
+auto is_resolvent_taut(std::vector<cnfkit::lit> const& lhs,
+                       std::vector<cnfkit::lit> const& rhs,
+                       cnfkit::lit resolve_at) -> bool
+{
   for (auto lhs_lit : lhs) {
     if (lhs_lit.get_var() == resolve_at.get_var()) {
       continue;
