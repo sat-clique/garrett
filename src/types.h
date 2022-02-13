@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cnfkit/literal.h>
-#include <gatekit/traits.h>
+#include <gatekit/clause.h>
 
 #include <chrono>
 #include <cstdint>
@@ -13,15 +13,18 @@ using ClauseHandle = Clause const*;
 
 namespace gatekit {
 template <>
-struct lit_traits<cnfkit::lit> {
-  static auto negate(cnfkit::lit literal) -> cnfkit::lit { return -literal; }
-  static auto to_index(cnfkit::lit literal) -> std::size_t { return literal.get_raw_value(); }
-  static auto to_var_index(cnfkit::lit literal) -> std::size_t
-  {
-    return literal.get_var().get_raw_value();
-  }
-};
+inline auto lit_to_dimacs<cnfkit::lit>(cnfkit::lit literal) -> int
+{
+  return cnfkit::lit_to_dimacs(literal);
 }
+
+template <>
+inline auto dimacs_to_lit<cnfkit::lit>(int literal) -> cnfkit::lit
+{
+  return cnfkit::dimacs_to_lit(literal);
+}
+}
+
 
 template <typename T>
 class ptr_iterator {
